@@ -1,0 +1,32 @@
+# Python
+*.pyc
+**/__pycache__
+**/*.pyc
+**/.pylint.d
+**/.mypy_cache
+**/.pytest_cache
+*.egg-info
+build
+**/venv
+
+# System-specific files
+.DS_Store
+**/.DS_Store
+
+# Docker
+docker-compose.*
+env.d
+
+# Docs
+docs
+*.md
+*.rst
+
+# Development/test cache & configurations
+.cache
+.circleci
+.git
+.github
+.vscode
+.ssh
+lib/gitlint

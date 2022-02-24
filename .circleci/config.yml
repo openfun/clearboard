@@ -1,0 +1,413 @@
+# CircleCI's configuration for clearboard
+#
+# Reference: https://circleci.com/docs/2.0/configuration-reference/
+
+aliases:
+  - &docker_login
+    # Login to DockerHub
+    #
+    # Nota bene: you'll need to define the following secrets environment vars
+    # in CircleCI interface:
+    #
+    #   - DOCKER_USER
+    #   - DOCKER_PASS
+    run:
+      name: Login to DockerHub
+      command: echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+# Configuration file anchors
+generate-version-file: &generate-version-file
+  run:
+    name: Create a version.json
+    command: |
+      # Create a version.json à-la-mozilla
+      # https://github.com/mozilla-services/Dockerflow/blob/master/docs/version_object.md
+      printf '{"commit":"%s","version":"%s","source":"https://github.com/%s/%s","build":"%s"}\n' \
+        "$CIRCLE_SHA1" \
+        "$CIRCLE_TAG" \
+        "$CIRCLE_PROJECT_USERNAME" \
+        "$CIRCLE_PROJECT_REPONAME" \
+        "$CIRCLE_BUILD_URL" > src/backend/clearboard/version.json
+
+version: 2.1
+jobs:
+  # Git jobs
+  # Check that the git history is clean and complies with our expectations
+  lint-git:
+    docker:
+      - image: circleci/python:3.8-buster
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    working_directory: ~/clearboard
+    steps:
+      - checkout
+      - run:
+          name: Check absence of fixup commits
+          command: |
+            ! git log | grep 'fixup!'
+      - run:
+          name: Install gitlint
+          command: |
+            pip install --user gitlint
+      - run:
+          name: lint commit messages added to main
+          command: |
+              ~/.local/bin/gitlint --commits origin/main..HEAD
+
+  # Check that the CHANGELOG has been updated in the current branch
+  check-changelog:
+    docker:
+      - image: circleci/buildpack-deps:stretch-scm
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    working_directory: ~/clearboard
+    steps:
+      - checkout
+      - run:
+          name: Check that the CHANGELOG has been modified in the current branch
+          command: |
+            git whatchanged --name-only --pretty="" origin..HEAD | grep CHANGELOG
+
+# Check that the CHANGELOG max line length does not exceed 80 characters
+  lint-changelog:
+    docker:
+      - image: debian:stretch
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    working_directory: ~/clearboard
+    steps:
+      - checkout
+      - run:
+          name: Check CHANGELOG max line length
+          command: |
+            # Get the longuest line width (ignoring release links)
+            test $(cat CHANGELOG.md | grep -Ev "^\[.*\]: https://github.com/openfun" | wc -L) -le 80
+
+  # Docker/back-end jobs
+  # Build job
+  # Build the Docker image ready for production
+  build-docker:
+    docker:
+      - image: circleci/buildpack-deps:stretch
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    working_directory: ~/clearboard
+    steps:
+      # Checkout repository sources
+      - checkout
+      # Generate a version.json file describing app release
+      - <<: *generate-version-file
+      # Activate docker-in-docker (with layers caching enabled)
+      - setup_remote_docker:
+          version: 20.10.7
+      - *docker_login
+      # Each image is tagged with the current git commit sha1 to avoid
+      # collisions in parallel builds.
+      - run:
+          name: Build production image
+          command: |
+            docker build \
+              -t clearboard:${CIRCLE_SHA1} \
+              .
+      - run:
+          name: Check built image availability
+          command: docker images "clearboard:${CIRCLE_SHA1}*"
+      - run:
+          name: Test running production image
+          command: ./docker/tests/run.sh clearboard ${CIRCLE_SHA1}
+
+  build-lambda-docker:
+    machine:
+      image: ubuntu-2004:202010-01
+    working_directory: ~/clearboard
+    steps:
+      # Checkout repository sources
+      - checkout
+      - *docker_login
+      # Each image is tagged with the current git commit sha1 to avoid
+      # collisions in parallel builds.
+      - run: 
+          name: Build production image
+          command: ./bin/lambda build ${CIRCLE_SHA1}
+
+      - run:
+          name: Check built image availability
+          command: docker image ls "${LAMBDA_IMAGE_NAME}:${CIRCLE_SHA1}"
+
+  # Build backend development environment
+  build-back:
+    docker:
+      - image: cimg/python:3.9
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    working_directory: ~/clearboard/src/backend
+    steps:
+      - checkout:
+          path: ~/clearboard
+      - restore_cache:
+          keys:
+            - v4-back-dependencies-{{ .Revision }}
+      - run:
+          name: Install development dependencies
+          command: pip install --user .[dev]
+      - save_cache:
+          paths:
+            - ~/.local
+          key: v4-back-dependencies-{{ .Revision }}
+
+  lint-back:
+    docker:
+      - image: cimg/python:3.9
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    working_directory: ~/clearboard/src/backend
+    steps:
+      - checkout:
+          path: ~/clearboard
+      - restore_cache:
+          keys:
+            - v4-back-dependencies-{{ .Revision }}
+      - run:
+          name: Lint code with isort
+          command: ~/.local/bin/isort --check-only clearboard
+      - run:
+          name: Lint code with black
+          command: ~/.local/bin/black --check clearboard
+      - run:
+          name: Lint code with flake8
+          command: ~/.local/bin/flake8 clearboard
+      - run:
+          name: Lint code with pylint
+          command: ~/.local/bin/pylint --rcfile=pylintrc clearboard
+      - run:
+          name: Lint code with bandit
+          command: ~/.local/bin/bandit -c .bandit -qr clearboard
+
+  # ---- Lambda related jobs ----
+  lint-lambda-enhance:
+    docker:
+      - image: cimg/python:3.9
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+      # Run on the highest version of node available on AWS Lambda
+      # https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
+    working_directory: ~/clearboard/src/terraform/lambda-enhance
+    steps:
+      - checkout:
+          path: ~/clearboard
+      # Use dev dependencies from main image for linting
+      - restore_cache:
+          keys:
+            - v4-back-dependencies-{{ .Revision }}
+      - run:
+          name: Lint code with isort
+          command: ~/.local/bin/isort --check-only .
+      - run:
+          name: Lint code with black
+          command: ~/.local/bin/black --check .
+      - run:
+          name: Lint code with flake8
+          command: ~/.local/bin/flake8 .
+      - run:
+          name: Lint code with pylint
+          command: ~/.local/bin/pylint --rcfile=pylintrc .
+      - run:
+          name: Lint code with bandit
+          command: ~/.local/bin/bandit -c .bandit -qr .
+
+  # ---- DockerHub publication job ----
+  hub:
+    docker:
+      - image: circleci/buildpack-deps:stretch
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    working_directory: ~/clearboard
+    steps:
+      - checkout
+      # Generate a version.json file describing app release
+      - <<: *generate-version-file
+      # Activate docker-in-docker (with layers caching enabled)
+      - setup_remote_docker:
+          version: 20.10.7
+      - *docker_login
+      - run:
+          name: Build production image (using cached layers)
+          command: |
+            docker build \
+              -t clearboard:${CIRCLE_SHA1} \
+              .      
+
+      # Tag docker images with the same pattern used in Git (Semantic Versioning)
+      #
+      # Git tag: v1.0.1
+      # Docker tag: 1.0.1(-dev)
+      - run:
+          name: Tag images
+          command: |
+            docker images fundocker/clearboard
+            DOCKER_TAG=$([[ -z "$CIRCLE_TAG" ]] && echo $CIRCLE_BRANCH || echo ${CIRCLE_TAG} | sed 's/^v//')
+            RELEASE_TYPE=$([[ -z "$CIRCLE_TAG" ]] && echo "branch" || echo "tag ")
+            # Display either:
+            # - DOCKER_TAG: main (Git branch)
+            # or
+            # - DOCKER_TAG: 1.1.2 (Git tag v1.1.2)
+            echo "DOCKER_TAG: ${DOCKER_TAG} (Git ${RELEASE_TYPE}${CIRCLE_TAG})"
+            docker tag clearboard:${CIRCLE_SHA1} fundocker/clearboard:${DOCKER_TAG}
+            if [[ -n "$CIRCLE_TAG" ]]; then
+              docker tag clearboard:${CIRCLE_SHA1} fundocker/clearboard:latest
+            fi
+            docker images | grep -E "^fundocker/clearboard\s*(${DOCKER_TAG}.*|latest|main)"
+
+      # Publish images to DockerHub
+      #
+      # Nota bene: logged user (see "Login to DockerHub" step) must have write
+      # permission for the project's repository; this also implies that the
+      # DockerHub repository already exists.
+      - run:
+          name: Publish images
+          command: |
+            DOCKER_TAG=$([[ -z "$CIRCLE_TAG" ]] && echo $CIRCLE_BRANCH || echo ${CIRCLE_TAG} | sed 's/^v//')
+            RELEASE_TYPE=$([[ -z "$CIRCLE_TAG" ]] && echo "branch" || echo "tag ")
+            # Display either:
+            # - DOCKER_TAG: main (Git branch)
+            # or
+            # - DOCKER_TAG: 1.1.2 (Git tag v1.1.2)
+            echo "DOCKER_TAG: ${DOCKER_TAG} (Git ${RELEASE_TYPE}${CIRCLE_TAG})"
+            docker push fundocker/clearboard:${DOCKER_TAG}
+            if [[ -n "$CIRCLE_TAG" ]]; then
+              docker push fundocker/clearboard:latest
+            fi
+
+  lambda-publish:
+    machine:
+      image: ubuntu-2004:202010-01
+    working_directory: ~/clearboard
+    steps:
+      - checkout
+      # Generate a version.json file describing app release
+      - <<: *generate-version-file
+      - *docker_login
+      - run:
+          name: Build production image (using cached layers)
+          command: ./bin/lambda build ${CIRCLE_SHA1}
+      # Tag docker images with the same pattern used in Git (Semantic Versioning)
+      #
+      # Git tag: v1.0.1
+      # Docker tag: 1.0.1(-dev)
+      - run:
+          name: Tag images
+          command: |
+            docker image ls "${LAMBDA_IMAGE_NAME}:production"
+            DOCKER_TAG=$([[ -z "$CIRCLE_TAG" ]] && echo $CIRCLE_BRANCH || echo ${CIRCLE_TAG} | sed 's/^v//')
+            RELEASE_TYPE=$([[ -z "$CIRCLE_TAG" ]] && echo "branch" || echo "tag ")
+            # Display either:
+            # - DOCKER_TAG: main (Git branch)
+            # or
+            # - DOCKER_TAG: 1.1.2 (Git tag v1.1.2)
+            echo "DOCKER_TAG: ${DOCKER_TAG} (Git ${RELEASE_TYPE}${CIRCLE_TAG})"
+            ./bin/lambda tag ${DOCKER_TAG} ${CIRCLE_SHA1}
+            if [[ -n "$CIRCLE_TAG" ]]; then
+              ./bin/lambda tag latest ${CIRCLE_SHA1}
+            fi
+            docker image ls ${LAMBDA_IMAGE_NAME}
+
+      # Publish images to ECR
+      - run:
+          name: Publish images
+          command: |
+            DOCKER_TAG=$([[ -z "$CIRCLE_TAG" ]] && echo $CIRCLE_BRANCH || echo ${CIRCLE_TAG} | sed 's/^v//')
+            RELEASE_TYPE=$([[ -z "$CIRCLE_TAG" ]] && echo "branch" || echo "tag ")
+            # Display either:
+            # - DOCKER_TAG: main (Git branch)
+            # or
+            # - DOCKER_TAG: 1.1.2 (Git tag v1.1.2)
+            echo "DOCKER_TAG: ${DOCKER_TAG} (Git ${RELEASE_TYPE}${CIRCLE_TAG})"
+            ./bin/lambda publish ${DOCKER_TAG}
+            if [[ -n "$CIRCLE_TAG" ]]; then
+              ./bin/lambda publish latest
+            fi
+        
+
+workflows:
+  version: 2
+
+  clearboard:
+    jobs:
+      # Git jobs
+      #
+      # Check validity of git history
+      - lint-git:
+          filters:
+            tags:
+              only: /.*/
+
+      # Check changelog validity
+      - check-changelog:
+          filters:
+            branches:
+              ignore: main
+            tags:
+              ignore: /.*/
+      - lint-changelog:
+          filters:
+            branches:
+              ignore: main
+            tags:
+              ignore: /.*/
+
+      # Lambda related jobs
+      - build-lambda-docker:
+          filters:
+            tags:
+              only: /.*/
+      - lint-lambda-enhance:
+          filters:
+            tags:
+              only: /.*/
+
+      # Docker jobs
+      #
+      # Build, lint and test production and development Docker images
+      # (debian-based)
+      - build-docker:
+          filters:
+            tags:
+              only: /.*/
+      - build-back:
+          filters:
+            tags:
+              only: /.*/
+      - lint-back:
+          requires:
+            - build-back
+          filters:
+            tags:
+              only: /.*/
+
+      # DockerHub publication.
+      #
+      # Publish docker images only if all build, lint and test jobs succeed and
+      # it has been tagged with a tag starting with the letter v
+      - hub:
+          requires:
+            - build-docker
+          filters:
+            branches:
+              only: main
+            tags:
+              only: /^v.*/
+
+      - lambda-publish:
+          filters:
+            branches:
+              only: main
+            tags:
+              only: /^v.*/

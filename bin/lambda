@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+
+set -eo pipefail
+
+BASE_DIR=$(dirname "${BASH_SOURCE[0]}")
+
+# Using the env file is not mandatory. Variables can be already set in the current environment
+if [[ -f "${BASE_DIR}/../env.d/lambda" ]]; then
+  # shellcheck source=env.d/lambda
+  source "${BASE_DIR}/../env.d/lambda"
+fi
+
+# usage: display usage with the appropriate exit code
+#
+# usage: usage [EXIT_CODE]
+#
+#   EXIT_CODE: program exit code (default: 0)
+function usage(){
+  declare -i exit_code="${1:-0}"
+
+  echo -e "Usage: bin/lambda [OPTIONS] COMMAND
+
+OPTIONS:
+  -h, --help    print this message
+
+COMMANDS:
+  build         build the image clearboard-enhance
+  tag           tag the image with the ECR reposittory name and desired tag
+  publish       publish the image to the ECR repository  
+"
+
+  # shellcheck disable=SC2086
+  exit ${exit_code}
+}
+
+function build() {
+  while true; do
+    case "${1}" in
+      -h|--help)
+        echo -e "Usage: build [OPTIONS] [TAG]
+build the clearboard-enhance:latest image containing the code.
+
+OPTIONS:
+  -h, --help
+         print this message
+
+" 1>&2
+        return;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+  docker build \
+    -t "clearboard-enhance:latest" "${BASE_DIR}"/../src/terraform/
+}
+
+function tag() {
+  while true; do
+    case "${1}" in
+      -h|--help)
+        echo -e "Usage: tag [OPTIONS] [TAG] [ORIGINAL_TAG]
+Create a tag for ${LAMBDA_REPOSITORY_URL}:[TAG] that refers to clearboard-enhance:latest
+
+OPTIONS:
+  -h, --help
+         print this message
+
+TAG:            optional tag used on the tagged image (default: production)
+
+" 1>&2
+        return;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+
+  tag="${1:-production}"
+  docker tag "clearboard-enhance:latest" "${LAMBDA_REPOSITORY_URL}:${tag}"
+}
+
+function publish() {
+  while true; do
+    case "${1}" in
+      -h|--help)
+        echo -e "Usage: publish [OPTIONS] [TAG]
+publish the image ${LAMBDA_REPOSITORY_URL}:[TAG]
+
+OPTIONS:
+  -h, --help
+         print this message
+      
+TAG:  The tag to publish (default: production)
+
+" 1>&2
+        return;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+  tag="${1:-production}"
+  docker run --rm \
+    --env AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+    --env AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+    --env AWS_REGION="${AWS_REGION}" \
+      amazon/aws-cli ecr get-login-password --region "${AWS_REGION}" | \
+      docker login --username AWS --password-stdin "${LAMBDA_REPOSITORY_URL}"
+  echo "${LAMBDA_REPOSITORY_URL}:${tag}"
+  docker push "${LAMBDA_REPOSITORY_URL}:${tag}"
+}
+
+while true; do
+  case "${1}" in
+    -h|--help|help)
+      usage 0
+      ;;
+    build|publish|tag)
+      # Perform action
+      "$@"
+      exit 0;
+      ;;
+    *)
+      usage 1
+      ;;
+  esac
+done
