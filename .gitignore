@@ -155,3 +155,5 @@ transmuxed_video
 
 # ngrok
 .ngrok_url
+
+*.jpg
