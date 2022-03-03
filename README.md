@@ -18,12 +18,13 @@ $ docker-compose -v
   docker-compose version 1.27.4, build 40524192
 ```
 
->⚠️ You may need to run the following commands with `sudo` but this can be
->avoided by assigning your user to the `docker` group.
+> ⚠️ You may need to run the following commands with `sudo` but this can be
+> avoided by assigning your user to the `docker` group.
 
 ### Project bootstrap
 
 The easiest way to start working on the project is to use our `Makefile` :
+
 ```bash
 $ make bootstrap
 ```
@@ -41,6 +42,15 @@ The `app` container is the FastAPI web server that serves the API to:
 - serve a CloudFront signed url to retrieve the processed image from the destination bucket
 
 You should be able to access the API overview interface at (http://localhost:8070).
+
+You need to create a .env file in the backend repository to specify parameters used in clearboard/config.py. At the moment there are 2 parameters:
+
+- `CORE_ADDRESS` the part of the post address that is fixed (which will be exchanged with the front server)
+- `ORIGINS` used when adding a middle ware that whitelist origins that can contact the api
+
+Example :
+CORE_ADDRESS="http://localhost:3000/"
+ORIGINS='["http://localhost:3000"]'
 
 #### Lambda enhance
 
