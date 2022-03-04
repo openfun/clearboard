@@ -9,9 +9,12 @@ from . import config
 
 
 app = FastAPI()
+
+
 @lru_cache()
 def get_settings():
     return config.Settings()
+
 
 settings = get_settings()
 print(settings)
@@ -23,8 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/policy")
-def get_policy(custom_address: str = "dty", settings: config.Settings = Depends(get_settings)):
+async def get_policy(custom_address: str = "picture", settings: config.Settings = Depends(get_settings)):
     """custom_address: string, part of the url that identify one meeting from another """
-    data = {"url": f"{settings.core_address}{custom_address}" }
+    data = {"url": f"{settings.core_address}{custom_address}"}
     return data
