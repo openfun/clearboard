@@ -5,6 +5,9 @@ FROM python:3.9-slim as base
 
 # Upgrade pip to its latest release to speed up dependencies installation
 RUN python -m pip install --upgrade pip
+RUN apt-get update && apt-get install -y python3-opencv
+RUN pip install opencv-python
+RUN pip install uvicorn[standard]
 
 # Upgrade system packages to install security updates
 RUN apt-get update && \
@@ -65,7 +68,7 @@ USER ${DOCKER_USER}
 
 # Run uvicorn as development server
 CMD ["uvicorn", "clearboard.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--reload", "--log-level", "debug"]
+  "--reload", "--log-level", "debug"]
 
 # ---- Production image ----
 FROM core as production
