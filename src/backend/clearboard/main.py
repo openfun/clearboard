@@ -82,34 +82,6 @@ async def post_picture(file: UploadFile = File(...)):
         return {"message": file.filename}
 
 
-        
-@app.websocket("/ws11")
-async def websocket_endpoint(websocket: WebSocket):
-    print("started")
-    #await websocket.accept()
-    await manager.connect(websocket)
-    temps = 0
-    cnt = 0
-    try:
-        while True:
-            time.sleep(1)
-            cnt +=1
-            if (temps != os.path.getctime('./clearboard/11.jpg')):
-                img = Image.open('./clearboard/11.jpg')
-                time.sleep(1)
-                temps = os.path.getctime('./clearboard/11.jpg')
-                volume = np.asarray(img)
-                image = get_image(volume)
-                await websocket.send_bytes(image)
-                print('image sent')
-            else:
-                print("pas de changement")
-                if cnt == 10:
-                    cnt = 0
-                    print('cnt')
-    except WebSocketDisconnect:
-            print('deco')
-            manager.disconnect(websocket)
              
 def image_to_base64(img: np.ndarray) -> bytes:
     """ Given a numpy 2D array, returns a JPEG image in base64 format """
@@ -121,49 +93,6 @@ def image_to_base64(img: np.ndarray) -> bytes:
 def get_image(volume):
     image = volume
     return image_to_base64(image)
-
-
-### test
-async def _alive_task(websocket: WebSocket):
-    try:
-        await websocket.receive_text()
-        asyncio.sleep(4)
-    except (WebSocketDisconnect, ConnectionClosedError):
-        pass
-        
-async def _send_data(websocket: WebSocket):
-    try:
-        while True:
-            img = Image.open('./clearboard/11.jpg')
-            volume = np.asarray(img)
-            image = get_image(volume)
-            await websocket.send_bytes(image)
-            asyncio.sleep(4)
-            print('image sent')
-    except (WebSocketDisconnect, ConnectionClosedError):
-        print("error")
-        pass
-
-
-@app.websocket("/ws")
-async def handle_something(websocket: WebSocket):
-    await websocket.accept()
-    
-    loop = asyncio.get_running_loop()
-    alive_task = loop.create_task(
-        _alive_task(websocket),
-        name=f"WS alive check: {websocket.client}",
-    )
-    send_task: asyncio.Task = loop.create_task(
-        _send_data(websocket),
-        name=f"WS data sending: {websocket.client}",
-    )
-    
-    alive_task.add_done_callback(send_task.cancel)
-    send_task.add_done_callback(alive_task.cancel)
-    
-    await asyncio.wait({alive_task, send_task})
-
 
 @app.get("/photo")
 async def photo():
@@ -202,3 +131,10 @@ async def websocket_endpoint(websocket: WebSocket):
                
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        
+class Item(BaseModel):
+    coord : list
+        
+@app.post("/coord")
+async def post_coord(c : Item):
+    print(c)
