@@ -29,7 +29,7 @@ import numpy as np
 from . import config
 
 app = FastAPI()
-
+np.save('./coord.npy', None)
 
 class ConnectionManager:
     def __init__(self):
@@ -106,6 +106,21 @@ def get_image(volume):
 @app.get("/photo")
 async def photo():
     try:
+        if os.path.exists(os.path.abspath('./cropped_reoriented.png')):
+            img = Image.open('./cropped_reoriented.png')
+            volume = np.asarray(img)
+            image = get_image(volume)
+            print('image sent')
+            return Response(content=image)
+        else:
+            print('file not found')
+            time.sleep(1)
+    except:
+        print('no file to send')
+        
+@app.get("/original_photo")
+async def photo():
+    try:
         if os.path.exists(os.path.abspath('./clearboard/11.jpg')):
             img = Image.open('./clearboard/11.jpg')
             volume = np.asarray(img)
@@ -123,34 +138,47 @@ async def photo():
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     temps = 0
+    temps_coord = 0
     try:
         while True:
             await websocket.receive_text()
-            if os.path.isfile(os.path.abspath('./clearboard/11.jpg')):
-                print('file found')
-                if (temps != os.path.getctime('./clearboard/11.jpg')):
+            if (os.path.isfile(os.path.abspath('./clearboard/11.jpg') ) and (temps != os.path.getctime('./clearboard/11.jpg')) ):
                     temps = os.path.getctime('./clearboard/11.jpg')
+                    temps_coord = os.path.getctime('./coord.npy')
+                    print('change file')
+                    try:
+                        c = np.load("./coord.npy")
+                    except:
+                        c = None
+                    traitement("./clearboard/11.jpg",c)
                     print('new photo to send')
+                    
                     await manager.send_personal_message("true", websocket)
-                else:
-                    await manager.send_personal_message("false", websocket)
+            
+            elif (os.path.isfile(os.path.abspath('./coord.npy'))) and (temps_coord != os.path.getctime('./coord.npy')):
+                temps_coord = os.path.getctime('./coord.npy')
+                print('change of coordinates')
+                try:
+                    c = np.load("./coord.npy")
+                except:
+                    c = None
+                traitement("./clearboard/11.jpg",c)
+                print('new photo to send')
+                
+                await manager.send_personal_message("true", websocket)
+                
             else:
-                print('no file found')
-                time.sleep(1)
+                await manager.send_personal_message("false", websocket)
 
     except WebSocketDisconnect:
+        np.save('./coord.npy', None)
         manager.disconnect(websocket)
 
 
 class Item(BaseModel):
-    coord: list
+    coord: List[List[str]] = []
 
-
-@app.post("/coord")
-async def post_coord(c: Item):
-    print(c)
-
-    def traitement(imageNT, coordonnees):
+def traitement(imageNT, coordonnees):
         def order_points(pts):
             rect = np.zeros((4, 2), dtype="float32")
             s = pts.sum(axis=1)
@@ -180,13 +208,26 @@ async def post_coord(c: Item):
             return warped
 
         image = cv2.imread(imageNT)
-        cnt = np.array(coordonnees)
-        cropped = four_point_transform(image, cnt)
+        cropped = image.copy()
+        try:
+            cnt = np.array(coordonnees)
+            print(cnt)
+            cropped = four_point_transform(image, cnt)
+        except:
+            pass
+        
+        cv2.imwrite("./cropped_reoriented.png", cropped)
 
-        cv2.imwrite("cropped_reoriented.png", cropped)
 
+@app.post("/coord")
+async def post_coord(coordinates: Item):
+    c = coordinates.coord
+    co = [ [int(float(k[0])), int(float(k[1]))] for k in c]
+    np.save('./coord.npy', co)
+    
     try:
-        traitement('./clearboard/11.jpg', c)
+        traitement('./clearboard/11.jpg', co)
+        print('tses2')
 
-    except:
-        print('error occured')
+    except Exception as e:
+        print(e)
