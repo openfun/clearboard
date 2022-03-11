@@ -5,8 +5,6 @@ origins : string[], url to whitelist and on which the fastapi server should list
 
 
 import cv2  # Import the OpenCV library
-
-
 from fastapi import FastAPI, Depends, Response, UploadFile, File, WebSocket, WebSocketDisconnect
 from websockets.exceptions import ConnectionClosedError
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +28,7 @@ from . import config
 
 app = FastAPI()
 np.save('./coord.npy', None)
+img_cropped = None
 
 class ConnectionManager:
     def __init__(self):
@@ -106,8 +105,8 @@ def get_image(volume):
 @app.get("/photo")
 async def photo():
     try:
-        if os.path.exists(os.path.abspath('./cropped_reoriented.png')):
-            img = Image.open('./cropped_reoriented.png')
+        if os.path.exists(os.path.abspath('./cropped_reoriented.jpg')):
+            img = Image.open('./cropped_reoriented.jpg')
             volume = np.asarray(img)
             image = get_image(volume)
             print('image sent')
@@ -121,8 +120,8 @@ async def photo():
 @app.get("/original_photo")
 async def photo():
     try:
-        if os.path.exists(os.path.abspath('./clearboard/11.jpg')):
-            img = Image.open('./clearboard/11.jpg')
+        if os.path.exists(os.path.abspath('./clearboard/img_test.jpg')):
+            img = Image.open('./clearboard/img_test.jpg')
             volume = np.asarray(img)
             image = get_image(volume)
             print('image sent')
@@ -142,15 +141,15 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             await websocket.receive_text()
-            if (os.path.isfile(os.path.abspath('./clearboard/11.jpg') ) and (temps != os.path.getctime('./clearboard/11.jpg')) ):
-                    temps = os.path.getctime('./clearboard/11.jpg')
+            if (os.path.isfile(os.path.abspath('./clearboard/img_test.jpg') ) and (temps != os.path.getctime('./clearboard/img_test.jpg')) ):
+                    temps = os.path.getctime('./clearboard/img_test.jpg')
                     temps_coord = os.path.getctime('./coord.npy')
                     print('change file')
                     try:
                         c = np.load("./coord.npy")
                     except:
                         c = None
-                    traitement("./clearboard/11.jpg",c)
+                    traitement("./clearboard/img_test.jpg",c)
                     print('new photo to send')
                     
                     await manager.send_personal_message("true", websocket)
@@ -162,7 +161,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     c = np.load("./coord.npy")
                 except:
                     c = None
-                traitement("./clearboard/11.jpg",c)
+                traitement("./clearboard/img_test.jpg",c)
                 print('new photo to send')
                 
                 await manager.send_personal_message("true", websocket)
@@ -216,17 +215,26 @@ def traitement(imageNT, coordonnees):
         except:
             pass
         
-        cv2.imwrite("./cropped_reoriented.png", cropped)
+        start = time.time()
+        cv2.imwrite("./cropped_reoriented.jpg", cropped)
+        end =  time.time()
+        print('temps imwrite save', end -start)
 
 
 @app.post("/coord")
 async def post_coord(coordinates: Item):
     c = coordinates.coord
     co = [ [int(float(k[0])), int(float(k[1]))] for k in c]
+    start = time.time()
     np.save('./coord.npy', co)
+    end =  time.time()
+    print('temps np save', end -start)
     
     try:
-        traitement('./clearboard/11.jpg', co)
+        start = time.time()
+        traitement('./clearboard/img_test.jpg', co)
+        end = time.time()
+        print('temps traitement', end-start)
         print('tses2')
 
     except Exception as e:
