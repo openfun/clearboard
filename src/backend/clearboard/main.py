@@ -91,8 +91,6 @@ async def post_picture(file: UploadFile = File(...)):
 
 def image_to_base64(img: np.ndarray) -> bytes:
     """ Given a numpy 2D array, returns a JPEG image in base64 format """
-
-    # using opencv 2, there are others ways
     img_buffer = imencode('.jpg', img)[1]
     return base64.b64encode(img_buffer).decode('utf-8')
 
@@ -174,7 +172,7 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-class Item(BaseModel):
+class Coordinates(BaseModel):
     coord: List[List[str]] = []
 
 def traitement(imageNT, coordonnees):
@@ -210,7 +208,6 @@ def traitement(imageNT, coordonnees):
         cropped = image.copy()
         try:
             cnt = np.array(coordonnees)
-            print(cnt)
             cropped = four_point_transform(image, cnt)
         except:
             pass
@@ -218,24 +215,23 @@ def traitement(imageNT, coordonnees):
         start = time.time()
         cv2.imwrite("./cropped_reoriented.jpg", cropped)
         end =  time.time()
-        print('temps imwrite save', end -start)
+        print('temps imwrite save', end - start)
 
 
 @app.post("/coord")
-async def post_coord(coordinates: Item):
+async def post_coord(coordinates: Coordinates):
     c = coordinates.coord
     co = [ [int(float(k[0])), int(float(k[1]))] for k in c]
     start = time.time()
     np.save('./coord.npy', co)
     end =  time.time()
-    print('temps np save', end -start)
+    print('temps np save', end - start)
     
     try:
         start = time.time()
         traitement('./clearboard/img_test.jpg', co)
         end = time.time()
-        print('temps traitement', end-start)
-        print('tses2')
+        print('temps traitement', end - start)
 
     except Exception as e:
         print(e)
