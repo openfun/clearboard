@@ -112,14 +112,14 @@ async def photo(process=""):
             before = './cropped_reoriented.jpg'
         else:
             before = './clearboard/img_test.jpg'
-        if process == "process1":
+        if process == 'Color':
             process1.whiteboard_enhance(cv2.imread(
                 before), "./processed.jpg")
-        elif process == "process2":
+        elif process == 'B&W':
             process2.black_n_white(before, "./processed.jpg")
-        elif process == "process3":
+        elif process == 'Contrast':
             process3.enhance_contrast(before, "./processed.jpg")
-        elif process == "process4":
+        elif process == 'original':
             after = before
         else:
             after = before
