@@ -107,27 +107,27 @@ def get_image(volume):
 @app.get("/photo")
 async def photo(process=""):
     try:
+        after = "./processed.jpg"
         if os.path.exists(os.path.abspath('./cropped_reoriented.jpg')):
-            if process == "process1":
-                print("process 1 selected")
-                process1.whiteboard_enhance(cv2.imread(
-                    "./cropped_reoriented.jpg"), "./cropped_reoriented.jpg")
-            elif process == "process2":
-                print("process 2 selected")
-                process2.black_n_white("./cropped_reoriented.jpg", "./cropped_reoriented.jpg")
-            elif process == "process3":
-                process3.enhance_contrast("./cropped_reoriented.jpg", "./cropped_reoriented.jpg")
-            elif process == "process4":
-                process4.super_res("./cropped_reoriented.jpg",
-                                   "./cropped_reoriented.jpg", "EDSR/EDSR_x4.pb")
-            img = Image.open('./cropped_reoriented.jpg')
-            volume = np.asarray(img)
-            image = get_image(volume)
-            print('image sent')
-            return Response(content=image)
+            before = './cropped_reoriented.jpg'
         else:
-            print('file not found')
-            time.sleep(1)
+            before = './clearboard/img_test.jpg'
+        if process == "process1":
+            process1.whiteboard_enhance(cv2.imread(
+                before), "./processed.jpg")
+        elif process == "process2":
+            process2.black_n_white(before, "./processed.jpg")
+        elif process == "process3":
+            process3.enhance_contrast(before, "./processed.jpg")
+        elif process == "process4":
+            after = before
+        else:
+            after = before
+        img = Image.open(after)
+        volume = np.asarray(img)
+        image = get_image(volume)
+        print('image sent')
+        return Response(content=image)
     except:
         print('no file to send')
 
