@@ -4,6 +4,8 @@ origins : string[], url to whitelist and on which the fastapi server should list
 """
 
 
+from importlib.resources import path
+from locale import strcoll
 import cv2  # Import the OpenCV library
 from fastapi import FastAPI, Depends, Response, UploadFile, File, WebSocket, WebSocketDisconnect
 from websockets.exceptions import ConnectionClosedError
@@ -14,7 +16,7 @@ import shutil
 import os
 
 import base64
-from typing import List
+from typing import List, Optional
 from PIL import Image
 from cv2 import imencode
 from pydantic import BaseModel
@@ -101,10 +103,12 @@ def get_image(volume):
 
 
 @app.get("/photo")
-async def photo():
+async def photo(roomName : Optional[str] = None):
     try:
-        if os.path.exists(os.path.abspath('./cropped_reoriented.jpg')):
-            img = Image.open('./cropped_reoriented.jpg')
+        path_img_traitee = './'+ roomName + '/' + roomName + 'traitee.jpg'
+        original_photo_path = './'+ roomName + '/' + roomName + '.jpg'
+        if os.path.exists(os.path.abspath(path_img_traitee)):
+            img = cv2.imread(path_img_traitee)
             volume = np.asarray(img)
             image = get_image(volume)
             print('image sent')
@@ -116,10 +120,11 @@ async def photo():
         print('no file to send')
         
 @app.get("/original_photo")
-async def photo():
+async def photo(roomName : Optional[str] = None):
     try:
-        if os.path.exists(os.path.abspath('./clearboard/img_test.jpg')):
-            img = Image.open('./clearboard/img_test.jpg')
+        original_photo_path = './'+ roomName + '/' + roomName + '.jpg'
+        if os.path.exists(os.path.abspath(original_photo_path)):
+            img = cv2.imread(original_photo_path)
             volume = np.asarray(img)
             image = get_image(volume)
             print('image sent')
@@ -138,16 +143,20 @@ async def websocket_endpoint(websocket: WebSocket):
     temps_coord = 0
     try:
         while True:
-            await websocket.receive_text()
-            if (os.path.isfile(os.path.abspath('./clearboard/img_test.jpg') ) and (temps != os.path.getctime('./clearboard/img_test.jpg')) ):
-                    temps = os.path.getctime('./clearboard/img_test.jpg')
+            print('test')
+            roomName = await websocket.receive_text()
+            original_photo_path = './'+ roomName + '/' + roomName + '.jpg'
+            path_img_traitee = './'+ roomName + '/' + roomName + 'traitee.jpg'
+
+            if (os.path.isfile(os.path.abspath(original_photo_path) ) and (temps != os.path.getctime(original_photo_path)) ):
+                    temps = os.path.getctime(original_photo_path)
                     temps_coord = os.path.getctime('./coord.npy')
                     print('change file')
                     try:
-                        c = np.load("./coord.npy")
+                        coordinates = np.load("./coord.npy")
                     except:
-                        c = None
-                    traitement("./clearboard/img_test.jpg",c)
+                        coordinates = None
+                    traitement(original_photo_path,coordinates, path_img_traitee )
                     print('new photo to send')
                     
                     await manager.send_personal_message("true", websocket)
@@ -156,10 +165,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 temps_coord = os.path.getctime('./coord.npy')
                 print('change of coordinates')
                 try:
-                    c = np.load("./coord.npy")
+                    coordinates = np.load("./coord.npy")
                 except:
-                    c = None
-                traitement("./clearboard/img_test.jpg",c)
+                    coordinates = None
+                traitement(original_photo_path,coordinates, path_img_traitee)
                 print('new photo to send')
                 
                 await manager.send_personal_message("true", websocket)
@@ -174,8 +183,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
 class Coordinates(BaseModel):
     coord: List[List[str]] = []
+    roomName : str 
+    
 
-def traitement(imageNT, coordonnees):
+def traitement(imageNT, coordonnees, path_img_traitee):
         def order_points(pts):
             rect = np.zeros((4, 2), dtype="float32")
             s = pts.sum(axis=1)
@@ -210,16 +221,20 @@ def traitement(imageNT, coordonnees):
             cnt = np.array(coordonnees)
             cropped = four_point_transform(image, cnt)
         except:
+            print('erreur lors du traitement')
             pass
         
         start = time.time()
-        cv2.imwrite("./cropped_reoriented.jpg", cropped)
+        cv2.imwrite(path_img_traitee, cropped)
         end =  time.time()
         print('temps imwrite save', end - start)
 
 
 @app.post("/coord")
-async def post_coord(coordinates: Coordinates):
+async def post_coord( coordinates : Coordinates ):
+    roomName = coordinates.roomName
+    path_img_traitee = './'+ roomName + '/' + roomName + 'traitee.jpg'
+    original_photo_path = './'+ roomName + '/' + roomName + '.jpg'
     c = coordinates.coord
     co = [ [int(float(k[0])), int(float(k[1]))] for k in c]
     start = time.time()
@@ -229,7 +244,7 @@ async def post_coord(coordinates: Coordinates):
     
     try:
         start = time.time()
-        traitement('./clearboard/img_test.jpg', co)
+        traitement(original_photo_path, co, path_img_traitee)
         end = time.time()
         print('temps traitement', end - start)
 
