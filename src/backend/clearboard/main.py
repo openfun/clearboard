@@ -161,17 +161,17 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     await manager.send_personal_message("true", websocket)
             
-            elif (os.path.isfile(os.path.abspath('./coord.npy'))) and (temps_coord != os.path.getctime('./coord.npy')):
-                temps_coord = os.path.getctime('./coord.npy')
-                print('change of coordinates')
-                try:
-                    coordinates = np.load("./coord.npy")
-                except:
-                    coordinates = None
-                traitement(original_photo_path,coordinates, path_img_traitee)
-                print('new photo to send')
-                
-                await manager.send_personal_message("true", websocket)
+                    if (os.path.isfile(os.path.abspath('./coord.npy'))) and (temps_coord != os.path.getctime('./coord.npy')):
+                        temps_coord = os.path.getctime('./coord.npy')
+                        print('change of coordinates')
+                        try:
+                            coordinates = np.load("./coord.npy")
+                        except:
+                            coordinates = None
+                        traitement(original_photo_path,coordinates, path_img_traitee)
+                        print('new photo to send')
+                        
+                        await manager.send_personal_message("true", websocket)
                 
             else:
                 await manager.send_personal_message("false", websocket)
