@@ -112,6 +112,7 @@ async def photo(process=""):
             before = './cropped_reoriented.jpg'
         else:
             before = './clearboard/img_test.jpg'
+        process4.super_res(before, after, "./clearboard/EDSR/EDSR_x4.pb")
         if process == 'Color':
             process1.whiteboard_enhance(cv2.imread(
                 before), "./processed.jpg")
@@ -121,6 +122,8 @@ async def photo(process=""):
             process3.enhance_contrast(before, "./processed.jpg")
         elif process == 'original':
             after = before
+        elif process == 'SuperRes':
+            process4.super_res(before, after, "./clearboard/EDSR/EDSR_x4.pb")
         else:
             after = before
         img = Image.open(after)
