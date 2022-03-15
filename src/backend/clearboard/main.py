@@ -214,20 +214,26 @@ def traitement(imageNT, coordonnees, path_img_traitee):
             M = cv2.getPerspectiveTransform(rect, dst)
             warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
             return warped
+        
 
         image = cv2.imread(imageNT)
         cropped = image.copy()
-        try:
-            cnt = np.array(coordonnees)
-            cropped = four_point_transform(image, cnt)
-        except:
-            print('erreur lors du traitement')
-            pass
         
-        start = time.time()
-        cv2.imwrite(path_img_traitee, cropped)
-        end =  time.time()
-        print('temps imwrite save', end - start)
+        if coordonnees is None :
+            cv2.imwrite(path_img_traitee, cropped)
+        else:  
+            try:
+                cnt = np.array(coordonnees)
+                cropped = four_point_transform(image, cnt)
+            except Exception as e:
+                print('erreur lors du traitement')
+                print(e)
+                pass
+            
+            start = time.time()
+            cv2.imwrite(path_img_traitee, cropped)
+            end =  time.time()
+            print('temps imwrite save', end - start)
 
 
 @app.post("/coord")
