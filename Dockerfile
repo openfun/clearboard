@@ -6,7 +6,7 @@ FROM python:3.9-slim as base
 # Upgrade pip to its latest release to speed up dependencies installation
 RUN python -m pip install --upgrade pip
 RUN apt-get update && apt-get install -y python3-opencv
-RUN pip install opencv-python
+RUN pip install opencv-contrib-python
 RUN pip install uvicorn[standard]
 
 # Upgrade system packages to install security updates
