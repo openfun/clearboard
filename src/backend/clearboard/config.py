@@ -3,7 +3,6 @@ from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-    core_address: str = "example.com"
     origins: typing.List = ["example.com", ]
 
     class Config:
