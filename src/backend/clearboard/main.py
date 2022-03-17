@@ -2,8 +2,6 @@
 core_address : string, defines the part of the url that wont change between several jitsi-box
 origins : string[], url to whitelist and on which the fastapi server should listen (basicly the core address)
 """
-
-
 import cv2  # Import the OpenCV library
 from fastapi import FastAPI, Depends, Response, UploadFile, File, WebSocket, WebSocketDisconnect
 from websockets.exceptions import ConnectionClosedError
@@ -25,49 +23,48 @@ import numpy as np
 from . import config
 
 app = FastAPI()
-np.save('./coord.npy', None)
-img_cropped = None
 
+dico_coord = {}
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: List[ (WebSocket, str)] = []
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, roomName : str):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self.active_connections.append((websocket, roomName))
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket, roomName):
+        self.active_connections.remove((websocket, roomName))
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
 
-    async def broadcast(self, message: str):
+    async def broadcast(self, message: str, roomName : str):
         for connection in self.active_connections:
-            await connection.send_text(message)
+            if roomName == connection[1]:
+                await connection[0].send_text(message)
 
 
 class Coordinates(BaseModel):
     coord: List[List[str]] = []
     roomName: str
 
-
 class Process(BaseModel):
     process: str
     roomName: str
 
-
 manager = ConnectionManager()
-
 
 @lru_cache()
 def get_settings():
     return config.Settings()
 
-
+async def send_message_true_broadcast(roomName):
+        await manager.broadcast("true", roomName)
+    
 settings = get_settings()
-print(settings)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
@@ -90,7 +87,9 @@ async def post_picture(file: UploadFile = File(...)):
         return {"message": "error"}
     else:
         path = f"./{file.filename[:-4]}"
-        print(path)
+        print(file.filename[:-4])
+        await send_message_true_broadcast(file.filename[:-4])
+        
         if not os.path.exists(path):
             os.makedirs(path)
         with open(f"{path}/{file.filename}", 'wb') as f:
@@ -107,39 +106,42 @@ def image_to_base64(img: np.ndarray) -> bytes:
 def get_image(image):
     return image_to_base64(image)
 
-
 @app.get("/process")
 async def photo(roomName: str, process: str):
-    try:
-        img_cropped_path = './' + roomName + '/' + roomName + 'cropped.jpg'
-        original_img_path = './' + roomName + '/' + roomName + '.jpg'
-        processed_img_path = './' + roomName + '/' + roomName + process + ".jpg"
-        if os.path.exists(os.path.abspath(img_cropped_path)):
+    global dico_coord
+    
+    original_img_path = './' + roomName + '/' + roomName + '.jpg'
+    img_cropped_path = './' + roomName + '/' + roomName + 'cropped.jpg'
+    
+    if os.path.exists(os.path.abspath(original_img_path)):
+        if roomName in dico_coord.keys():
+            parallax.crop(original_img_path, dico_coord[roomName],img_cropped_path)
             img_to_process = img_cropped_path
-        elif os.path.exists(os.path.abspath(original_img_path)):
-            img_to_process = original_img_path
-
-        if process == 'Color':
-            color.whiteboard_enhance(cv2.imread(
-                img_to_process), processed_img_path)
-        elif process == 'B&W':
-            blackNwhite.black_n_white(img_to_process, processed_img_path)
-        elif process == 'Contrast':
-            contrast.enhance_contrast(img_to_process, processed_img_path)
-        elif process == 'original':
-            processed_img_path = img_to_process
-        elif process == 'SuperRes':
-            super_res.super_res(img_to_process, processed_img_path, "./clearboard/EDSR/EDSR_x4.pb")
         else:
-            processed_img_path = img_to_process
-        img = cv2.imread(processed_img_path)
-        volume = np.asarray(img)
-        image = get_image(volume)
-        print('image sent')
-        return Response(content=image)
+            img_to_process = original_img_path
+        try:
+            processed_img_path = './' + roomName + '/' + roomName + process + ".jpg"
+            if process == 'Color':
+                color.whiteboard_enhance(cv2.imread(img_to_process), processed_img_path)
+            elif process == 'B&W':
+                blackNwhite.black_n_white(img_to_process, processed_img_path)
+            elif process == 'Contrast':
+                contrast.enhance_contrast(img_to_process, processed_img_path)
+            elif process == 'original':
+                processed_img_path = img_to_process
+            elif process == 'SuperRes':
+                super_res.super_res(img_to_process, processed_img_path, "./clearboard/EDSR/EDSR_x4.pb")
+            else:
+                processed_img_path = img_to_process
+            img = cv2.imread(processed_img_path)
+            volume = np.asarray(img)
+            image = get_image(volume)
+            print('image sent')
+            return Response(content=image)
 
-    except:
-        print('no file to send')
+        except Exception as e:
+            print(e)
+            print('no file to send')
 
 
 @app.get("/original_photo")
@@ -150,70 +152,28 @@ async def photo(roomName: Optional[str] = None):
             img = cv2.imread(original_img_path)
             volume = np.asarray(img)
             image = get_image(volume)
-            print('image sent')
+            print('original image sent')
             return Response(content=image)
         else:
-            print('file not found')
-            time.sleep(1)
-    except:
-        print('no file to send')
+            print('original image not found')
+    except Exception as e:
+        print(e)
 
 
-@app.websocket("/ws1")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    temps = 0
-    temps_coord = 0
-    try:
+@app.websocket("/ws/{roomName}/{id}")
+async def websocket_endpoint(websocket: WebSocket, roomName: str):
+    await manager.connect(websocket, roomName)
+    try: 
         while True:
-            print('test')
-            roomName = await websocket.receive_text()
-            original_img_path = './' + roomName + '/' + roomName + '.jpg'
-            img_cropped_path = './' + roomName + '/' + roomName + 'cropped.jpg'
-
-            if (os.path.isfile(os.path.abspath(original_img_path)) and (temps != os.path.getctime(original_img_path))):
-                temps = os.path.getctime(original_img_path)
-                temps_coord = os.path.getctime('./coord.npy')
-                print('change file')
-                try:
-                    coordinates = np.load("./coord.npy")
-                except:
-                    coordinates = None
-                parallax.crop(original_img_path, coordinates, img_cropped_path)
-                print('new photo to send')
-
-                await manager.send_personal_message("true", websocket)
-
-                if (os.path.isfile(os.path.abspath('./coord.npy'))) and (temps_coord != os.path.getctime('./coord.npy')):
-                    temps_coord = os.path.getctime('./coord.npy')
-                    print('change of coordinates')
-                    try:
-                        coordinates = np.load("./coord.npy")
-                    except:
-                        coordinates = None
-                    parallax.crop(original_img_path, coordinates, img_cropped_path)
-                    print('new photo to send')
-
-                    await manager.send_personal_message("true", websocket)
-
-            else:
-                await manager.send_personal_message("false", websocket)
-
+            await websocket.receive_text()
     except WebSocketDisconnect:
-        np.save('./coord.npy', None)
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, roomName)
 
 
 @app.post("/coord")
 async def post_coord(coordinates: Coordinates):
+    global dico_coord
     roomName = coordinates.roomName
-    img_cropped_path = './' + roomName + '/' + roomName + 'cropped.jpg'
-    original_img_path = './' + roomName + '/' + roomName + '.jpg'
     coords = [[int(float(k[0])), int(float(k[1]))] for k in coordinates.coord]
-    np.save('./coord.npy', coords)
-
-    try:
-        parallax.crop(original_img_path, coords, img_cropped_path)
-
-    except Exception as e:
-        print(e)
+    dico_coord[roomName] = coords
+    await send_message_true_broadcast(roomName)

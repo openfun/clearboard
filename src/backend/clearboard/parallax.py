@@ -37,7 +37,7 @@ def crop(original_img, coordinates, destination):
 
     image = cv2.imread(original_img)
     cropped = image.copy()
-    if coordinates is None:
+    if coordinates is None or len(coordinates) == 0:
         cv2.imwrite(destination, cropped)
     else:
         try:
