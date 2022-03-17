@@ -4,27 +4,22 @@ origins : string[], url to whitelist and on which the fastapi server should list
 """
 
 
-from importlib.resources import path
-from locale import strcoll
 import cv2  # Import the OpenCV library
 from fastapi import FastAPI, Depends, Response, UploadFile, File, WebSocket, WebSocketDisconnect
 from websockets.exceptions import ConnectionClosedError
 from fastapi.middleware.cors import CORSMiddleware
 from functools import lru_cache
-from . import config
-from . import parallax, process1, process2, process3, process4
+from . import blackNwhite, color, config, contrast, super_res
+from . import parallax
 import shutil
 import os
 
 import base64
 from typing import List, Optional
 from PIL import Image
-from cv2 import imencode
 from pydantic import BaseModel
-from starlette.websockets import WebSocket, WebSocketState
-from starlette.responses import StreamingResponse
+from starlette.websockets import WebSocket
 import time
-import asyncio
 
 import numpy as np
 from . import config
@@ -51,6 +46,16 @@ class ConnectionManager:
     async def broadcast(self, message: str):
         for connection in self.active_connections:
             await connection.send_text(message)
+
+
+class Coordinates(BaseModel):
+    coord: List[List[str]] = []
+    roomName: str
+
+
+class Process(BaseModel):
+    process: str
+    roomName: str
 
 
 manager = ConnectionManager()
@@ -95,45 +100,39 @@ async def post_picture(file: UploadFile = File(...)):
 
 def image_to_base64(img: np.ndarray) -> bytes:
     """ Given a numpy 2D array, returns a JPEG image in base64 format """
-    img_buffer = imencode('.jpg', img)[1]
+    img_buffer = cv2.imencode('.jpg', img)[1]
     return base64.b64encode(img_buffer).decode('utf-8')
 
 
-def get_image(volume):
-    image = volume
+def get_image(image):
     return image_to_base64(image)
-
-
-class Process(BaseModel):
-    process: str
-    roomName: str
 
 
 @app.get("/process")
 async def photo(roomName: str, process: str):
     try:
-        path_img_cropped = './' + roomName + '/' + roomName + 'cropped.jpg'
-        original_photo_path = './' + roomName + '/' + roomName + '.jpg'
-        after = './' + roomName + '/' + roomName + process+".jpg"
-        if os.path.exists(os.path.abspath(path_img_cropped)):
-            before = path_img_cropped
-        elif os.path.exists(os.path.abspath(original_photo_path)):
-            before = original_photo_path
+        img_cropped_path = './' + roomName + '/' + roomName + 'cropped.jpg'
+        original_img_path = './' + roomName + '/' + roomName + '.jpg'
+        processed_img_path = './' + roomName + '/' + roomName + process + ".jpg"
+        if os.path.exists(os.path.abspath(img_cropped_path)):
+            img_to_process = img_cropped_path
+        elif os.path.exists(os.path.abspath(original_img_path)):
+            img_to_process = original_img_path
 
         if process == 'Color':
-            process1.whiteboard_enhance(cv2.imread(
-                before), after)
+            color.whiteboard_enhance(cv2.imread(
+                img_to_process), processed_img_path)
         elif process == 'B&W':
-            process2.black_n_white(before, after)
+            blackNwhite.black_n_white(img_to_process, processed_img_path)
         elif process == 'Contrast':
-            process3.enhance_contrast(before, after)
+            contrast.enhance_contrast(img_to_process, processed_img_path)
         elif process == 'original':
-            after = before
+            processed_img_path = img_to_process
         elif process == 'SuperRes':
-            process4.super_res(before, after, "./clearboard/EDSR/EDSR_x4.pb")
+            super_res.super_res(img_to_process, processed_img_path, "./clearboard/EDSR/EDSR_x4.pb")
         else:
-            after = before
-        img = cv2.imread(after)
+            processed_img_path = img_to_process
+        img = cv2.imread(processed_img_path)
         volume = np.asarray(img)
         image = get_image(volume)
         print('image sent')
@@ -146,9 +145,9 @@ async def photo(roomName: str, process: str):
 @app.get("/original_photo")
 async def photo(roomName: Optional[str] = None):
     try:
-        original_photo_path = './' + roomName + '/' + roomName + '.jpg'
-        if os.path.exists(os.path.abspath(original_photo_path)):
-            img = cv2.imread(original_photo_path)
+        original_img_path = './' + roomName + '/' + roomName + '.jpg'
+        if os.path.exists(os.path.abspath(original_img_path)):
+            img = cv2.imread(original_img_path)
             volume = np.asarray(img)
             image = get_image(volume)
             print('image sent')
@@ -169,18 +168,18 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             print('test')
             roomName = await websocket.receive_text()
-            original_photo_path = './' + roomName + '/' + roomName + '.jpg'
-            path_img_cropped = './' + roomName + '/' + roomName + 'cropped.jpg'
+            original_img_path = './' + roomName + '/' + roomName + '.jpg'
+            img_cropped_path = './' + roomName + '/' + roomName + 'cropped.jpg'
 
-            if (os.path.isfile(os.path.abspath(original_photo_path)) and (temps != os.path.getctime(original_photo_path))):
-                temps = os.path.getctime(original_photo_path)
+            if (os.path.isfile(os.path.abspath(original_img_path)) and (temps != os.path.getctime(original_img_path))):
+                temps = os.path.getctime(original_img_path)
                 temps_coord = os.path.getctime('./coord.npy')
                 print('change file')
                 try:
                     coordinates = np.load("./coord.npy")
                 except:
                     coordinates = None
-                parallax.crop(original_photo_path, coordinates, path_img_cropped)
+                parallax.crop(original_img_path, coordinates, img_cropped_path)
                 print('new photo to send')
 
                 await manager.send_personal_message("true", websocket)
@@ -192,7 +191,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         coordinates = np.load("./coord.npy")
                     except:
                         coordinates = None
-                    parallax.crop(original_photo_path, coordinates, path_img_cropped)
+                    parallax.crop(original_img_path, coordinates, img_cropped_path)
                     print('new photo to send')
 
                     await manager.send_personal_message("true", websocket)
@@ -205,28 +204,16 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-class Coordinates(BaseModel):
-    coord: List[List[str]] = []
-    roomName: str
-
-
 @app.post("/coord")
 async def post_coord(coordinates: Coordinates):
     roomName = coordinates.roomName
-    path_img_cropped = './' + roomName + '/' + roomName + 'cropped.jpg'
-    original_photo_path = './' + roomName + '/' + roomName + '.jpg'
-    c = coordinates.coord
-    co = [[int(float(k[0])), int(float(k[1]))] for k in c]
-    start = time.time()
-    np.save('./coord.npy', co)
-    end = time.time()
-    print('temps np save', end - start)
+    img_cropped_path = './' + roomName + '/' + roomName + 'cropped.jpg'
+    original_img_path = './' + roomName + '/' + roomName + '.jpg'
+    coords = [[int(float(k[0])), int(float(k[1]))] for k in coordinates.coord]
+    np.save('./coord.npy', coords)
 
     try:
-        start = time.time()
-        parallax.crop(original_photo_path, co, path_img_cropped)
-        end = time.time()
-        print('temps traitement', end - start)
+        parallax.crop(original_img_path, coords, img_cropped_path)
 
     except Exception as e:
         print(e)

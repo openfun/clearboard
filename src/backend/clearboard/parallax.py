@@ -4,9 +4,9 @@ import numpy as np
 
 def order_points(pts):
     rect = np.zeros((4, 2), dtype="float32")
-    s = pts.sum(axis=1)
-    rect[0] = pts[np.argmin(s)]
-    rect[2] = pts[np.argmax(s)]
+    sum = pts.sum(axis=1)
+    rect[0] = pts[np.argmin(sum)]
+    rect[2] = pts[np.argmax(sum)]
     diff = np.diff(pts, axis=1)
     rect[1] = pts[np.argmin(diff)]
     rect[3] = pts[np.argmax(diff)]
@@ -15,6 +15,7 @@ def order_points(pts):
 
 def four_point_transform(image, pts):
     rect = order_points(pts)
+    #(tl, tr, br, bl) = (top_left, top_right, bottom_right, bottom_left)
     (tl, tr, br, bl) = rect
     widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
     widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
@@ -32,18 +33,17 @@ def four_point_transform(image, pts):
     return warped
 
 
-def crop(imageNT, coordonnees, destination):
+def crop(original_img, coordinates, destination):
 
-    image = cv2.imread(imageNT)
+    image = cv2.imread(original_img)
     cropped = image.copy()
-    if coordonnees is None:
+    if coordinates is None:
         cv2.imwrite(destination, cropped)
     else:
         try:
-            cnt = np.array(coordonnees)
+            cnt = np.array(coordinates)
             cropped = four_point_transform(image, cnt)
         except Exception as e:
-            print('erreur lors du traitement')
             print(e)
             pass
         cv2.imwrite(destination, cropped)
