@@ -7,3 +7,13 @@ and this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.0.1] - 2022-03-18
+
+### Added
+
+- Add openfun's rules to commit format
+
+### Changed
+
+- Fix several bugs in CI to make a clean starting repo
