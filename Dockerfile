@@ -36,6 +36,9 @@ COPY ./src/backend /app/
 # Copy entrypoint
 COPY ./docker/files/usr/local/bin/entrypoint /usr/local/bin/entrypoint
 
+# Copy gunicorn configuration
+COPY ./docker/files/usr/local/etc/gunicorn /usr/local/etc
+
 # Give the "root" group the same permissions as the "root" user on /etc/passwd
 # to allow a user belonging to the root group to add new users; typically the
 # docker user (see entrypoint).
@@ -65,7 +68,7 @@ USER ${DOCKER_USER}
 
 # Run uvicorn as development server
 CMD ["uvicorn", "clearboard.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--reload", "--log-level", "debug"]
+  "--reload", "--log-level", "debug"]
 
 # ---- Production image ----
 FROM core as production
