@@ -187,7 +187,7 @@ jobs:
           command: ~/.local/bin/pylint --rcfile=.pylintrc clearboard
       - run:
           name: Lint code with bandit
-          command: ~/.local/bin/bandit -c .bandit -qr clearboard
+          command: ~/.local/bin/bandit -c .banditrc -qr clearboard
 
   # ---- Lambda related jobs ----
   lint-lambda-enhance:
