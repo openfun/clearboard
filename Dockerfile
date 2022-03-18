@@ -37,7 +37,7 @@ COPY ./src/backend /app/
 COPY ./docker/files/usr/local/bin/entrypoint /usr/local/bin/entrypoint
 
 # Copy gunicorn configuration
-COPY ./docker/files/usr/local/etc/gunicorn /usr/local/etc
+COPY ./docker/files/usr/local/etc/gunicorn/clearboard.py /usr/local/etc/gunicorn/clearboard.py
 
 # Give the "root" group the same permissions as the "root" user on /etc/passwd
 # to allow a user belonging to the root group to add new users; typically the
@@ -78,4 +78,4 @@ ARG DOCKER_USER
 USER ${DOCKER_USER}
 
 # The default command runs gunicorn WSGI server in clearboard's main module
-CMD ["gunicorn", "-c", "/usr/local/etc/gunicorn/clearboard.py", "app.main:app"]
+CMD ["gunicorn", "-c", "/usr/local/etc/gunicorn/clearboard.py", "clearboard.main:app"]
