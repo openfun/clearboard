@@ -15,7 +15,7 @@ class Settings(BaseSettings):
         """Define fastapi env configuration"""
 
         env_prefix = ""
-        env_file = "../../env.d/development"
+        env_file = "../../env.d/development.dist"
         env_file_encoding = "utf-8"
         arbitrary_types_allowed = True
         case_sensitive = False
