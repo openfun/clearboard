@@ -53,7 +53,7 @@ jobs:
       - run:
           name: lint commit messages added to main
           command: |
-              ~/.local/bin/gitlint --commits origin/main..HEAD
+            ~/.local/bin/gitlint --commits origin/main..HEAD
 
   # Check that the CHANGELOG has been updated in the current branch
   check-changelog:
@@ -70,7 +70,7 @@ jobs:
           command: |
             git whatchanged --name-only --pretty="" origin..HEAD | grep CHANGELOG
 
-# Check that the CHANGELOG max line length does not exceed 80 characters
+  # Check that the CHANGELOG max line length does not exceed 80 characters
   lint-changelog:
     docker:
       - image: debian:stretch
@@ -130,7 +130,7 @@ jobs:
       - *docker_login
       # Each image is tagged with the current git commit sha1 to avoid
       # collisions in parallel builds.
-      - run: 
+      - run:
           name: Build production image
           command: ./bin/lambda build ${CIRCLE_SHA1}
 
@@ -184,7 +184,7 @@ jobs:
           command: ~/.local/bin/flake8 clearboard
       - run:
           name: Lint code with pylint
-          command: ~/.local/bin/pylint --rcfile=pylintrc clearboard
+          command: ~/.local/bin/pylint --rcfile=.pylintrc clearboard
       - run:
           name: Lint code with bandit
           command: ~/.local/bin/bandit -c .bandit -qr clearboard
@@ -243,7 +243,7 @@ jobs:
           command: |
             docker build \
               -t clearboard:${CIRCLE_SHA1} \
-              .      
+              .
 
       # Tag docker images with the same pattern used in Git (Semantic Versioning)
       #
@@ -334,7 +334,6 @@ jobs:
             if [[ -n "$CIRCLE_TAG" ]]; then
               ./bin/lambda publish latest
             fi
-        
 
 workflows:
   version: 2
