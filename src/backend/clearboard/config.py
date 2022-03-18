@@ -7,9 +7,7 @@ from pydantic import BaseSettings
 class Settings(BaseSettings):
     """Define fastapi settings"""
 
-    origins: typing.List = [
-        "example.com",
-    ]
+    ORIGINS: typing.List = []
 
     class Config:
         """Define fastapi env configuration"""
