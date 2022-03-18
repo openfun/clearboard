@@ -103,11 +103,14 @@ celerybeat-schedule
 .env
 .venv
 env/
-env.d/
+env.d/*
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Default environments for the CI
+!env.d/development.dist
 
 # Spyder project settings
 .spyderproject
