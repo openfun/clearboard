@@ -189,39 +189,6 @@ jobs:
           name: Lint code with bandit
           command: ~/.local/bin/bandit -c .banditrc -qr clearboard
 
-  # ---- Lambda related jobs ----
-  lint-lambda-enhance:
-    docker:
-      - image: cimg/python:3.9
-        auth:
-          username: $DOCKER_USER
-          password: $DOCKER_PASS
-      # Run on the highest version of node available on AWS Lambda
-      # https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
-    working_directory: ~/clearboard/src/terraform/lambda-enhance
-    steps:
-      - checkout:
-          path: ~/clearboard
-      # Use dev dependencies from main image for linting
-      - restore_cache:
-          keys:
-            - v4-back-dependencies-{{ .Revision }}
-      - run:
-          name: Lint code with isort
-          command: ~/.local/bin/isort --check-only .
-      - run:
-          name: Lint code with black
-          command: ~/.local/bin/black --check .
-      - run:
-          name: Lint code with flake8
-          command: ~/.local/bin/flake8 .
-      - run:
-          name: Lint code with pylint
-          command: ~/.local/bin/pylint --rcfile=pylintrc .
-      - run:
-          name: Lint code with bandit
-          command: ~/.local/bin/bandit -c .bandit -qr .
-
   # ---- DockerHub publication job ----
   hub:
     docker:
@@ -364,10 +331,6 @@ workflows:
 
       # Lambda related jobs
       - build-lambda-docker:
-          filters:
-            tags:
-              only: /.*/
-      - lint-lambda-enhance:
           filters:
             tags:
               only: /.*/
