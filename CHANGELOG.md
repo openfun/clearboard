@@ -7,3 +7,14 @@ and this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.0.1] 2022-03-18
+
+### Added
+
+    - Route to send and get picture
+    - Remove parallax from image
+    - Images enhancement options
+        - Black and White
+        - Color
+        - Better contrast
