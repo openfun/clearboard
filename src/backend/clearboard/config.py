@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     """Define fastapi settings"""
 
     ORIGINS: typing.List = []
+    MEDIA_ROOT: str
 
     class Config:
         """Define fastapi env configuration"""
