@@ -78,7 +78,7 @@ async def send_message_true_broadcast(room_name):
 app.add_middleware(
     CORSMiddleware,
     # allow_origins=settings.ORIGINS,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["https://jitsi-box.com", "https://www.jitsi-box.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
