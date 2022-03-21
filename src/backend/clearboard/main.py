@@ -78,7 +78,7 @@ async def send_message_true_broadcast(room_name):
 app.add_middleware(
     CORSMiddleware,
     # allow_origins=settings.ORIGINS,
-    allow_origins=["https://jitsi-box.com", "https://www.jitsi-box.com"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -114,6 +114,7 @@ async def get_process(room_name: str, process: str):
 
     original_img_path = "./" + room_name + "/" + room_name + ".jpg"
     img_cropped_path = "./" + room_name + "/" + room_name + "cropped.jpg"
+    processed_img_path = "./" + room_name + "/" + room_name + process + ".jpg"
 
     if os.path.exists(os.path.abspath(original_img_path)):
         if room_name in DICO_COORD:
@@ -121,9 +122,10 @@ async def get_process(room_name: str, process: str):
             img_to_process = img_cropped_path
         else:
             img_to_process = original_img_path
-            processed_img_path = "./" + room_name + "/" + room_name + process + ".jpg"
         if process == "Color":
-            color.whiteboard_enhance(cv2.imread(img_to_process), processed_img_path)
+            print('call color')
+            color.whiteboard_enhance(img_to_process, processed_img_path)
+            print('end color porcess')
         elif process == "B&W":
             black_n_white.black_n_white(img_to_process, processed_img_path)
         elif process == "Contrast":
