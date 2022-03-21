@@ -20,6 +20,7 @@ from . import black_n_white, color, config, contrast, parallax
 app = FastAPI()
 
 DICO_COORD = {}
+MEDIA_ROOT = "/data/media"
 
 
 class ConnectionManager:
@@ -73,11 +74,12 @@ async def send_message_true_broadcast(room_name):
 
 
 # Remove env loading
-settings = get_settings()
+# settings = get_settings()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ORIGINS,
+    # allow_origins=settings.ORIGINS,
+    allow_origins=["https://jitsi-box.com", "https://www.jitsi-box.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,7 +91,7 @@ async def post_picture(file: UploadFile = File(...)):
     """receive image not processed from the jitsi box, not from the student interface"""
     if not file:
         return {"message": "error"}
-    path = f"{settings.MEDIA_ROOT}/{file.filename[:-4]}"
+    path = f"{MEDIA_ROOT}/{file.filename[:-4]}"
     path_original_image = f"{path}/{file.filename}"
     print(file.filename[:-4])
     await send_message_true_broadcast(file.filename[:-4])
@@ -111,12 +113,10 @@ def image_to_base64(img: np.ndarray) -> bytes:
 async def get_process(room_name: str, process: str):
     """receive the filter type to use on the image"""
 
-    original_img_path = settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
-    img_cropped_path = (
-        settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + "cropped.jpg"
-    )
+    original_img_path = MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
+    img_cropped_path = MEDIA_ROOT + "/" + room_name + "/" + room_name + "cropped.jpg"
     processed_img_path = (
-        settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + process + ".jpg"
+        MEDIA_ROOT + "/" + room_name + "/" + room_name + process + ".jpg"
     )
 
     if os.path.exists(os.path.abspath(original_img_path)):
@@ -144,7 +144,7 @@ async def get_process(room_name: str, process: str):
 @app.get("/original_photo")
 async def photo(room_name: Optional[str] = None):
     """request from front to get the image not processed"""
-    original_img_path = settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
+    original_img_path = MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
     if os.path.exists(os.path.abspath(original_img_path)):
         img = cv2.imread(original_img_path)
         volume = np.asarray(img)
