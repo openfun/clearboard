@@ -45,6 +45,8 @@ COPY ./docker/files/usr/local/etc/gunicorn/clearboard.py /usr/local/etc/gunicorn
 # docker user (see entrypoint).
 RUN chmod g=u /etc/passwd
 
+RUN mkdir /data/media
+
 WORKDIR /app
 
 # We wrap commands run in this container by the following entrypoint that
