@@ -114,7 +114,7 @@ def get_black_white_indices(hist, tot_count, black_count, white_count):
         if color > black_count:
             black_ind = i
             break
-
+    print("break 1")
     color = 0
     for i in range(len(hist) - 1, -1, -1):
         color += hist[i]
@@ -134,9 +134,10 @@ def contrast_stretch(img, black_point, white_point):
         ch_hists.append(
             cv2.calcHist([channel], [0], None, [256], (0, 256)).flatten().tolist()
         )
-
+    print("end hist ppend")
     # get black and white percentage indices
     black_white_indices = ch_hists
+    print(len(ch_hists))
     for hist in ch_hists:
         black_white_indices.append(
             get_black_white_indices(
@@ -146,7 +147,7 @@ def contrast_stretch(img, black_point, white_point):
                 img.shape[0] * img.shape[1] * white_point / 100,
             )
         )
-
+    print("end get black")
     stretch_map = np.zeros((3, 256), dtype="uint8")
 
     # stretch histogram
@@ -165,7 +166,7 @@ def contrast_stretch(img, black_point, white_point):
                         )
                     else:
                         stretch_map[curr_ch][i] = 0
-
+    print("end strecth")
     # stretch image
     ch_stretch = []
     for i, channel in enumerate(cv2.split(img)):
@@ -233,7 +234,8 @@ def color_balance(img, low_per, high_per):
 
 def whiteboard_enhance(img, destination):
     """Enhance Whiteboard image"""
-
+    img = cv2.imread(img)
+    print("image read imrite")
     cs_black_per, cs_white_per = 2, 99.5
     gauss_k_size, gauss_sigma = 3, 1
     gamma_value = 1.1
@@ -242,13 +244,19 @@ def whiteboard_enhance(img, destination):
     # Difference of Gaussian (DoG)
     # Negative of image
     negative_img = negate(dog(img, 15, 100, 0))
+    print('end negate')
     # Contrast Stretch (CS)
     contrast_stretch_img = contrast_stretch(negative_img, cs_black_per, cs_white_per)
+    print("end contrast")
     # Gaussian Blur
     blur_img = fast_gaussian_blur(contrast_stretch_img, gauss_k_size, gauss_sigma)
+    print("end contrast")
     # Gamma Correction
     gamma_img = gamma(blur_img, gamma_value)
+    print("end gamme")
     # Color Balance (CB) (also Contrast Stretch)
     color_balanced_img = color_balance(gamma_img, cb_black_per, cb_white_per)
+    print("end color balance")
 
     cv2.imwrite(destination, color_balanced_img)
+    print("fil saved ")
