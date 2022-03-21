@@ -109,12 +109,11 @@ def get_black_white_indices(hist, tot_count, black_count, white_count):
     black_ind = 0
     white_ind = 255
     color = 0
-    for value, i in enumerate(hist):
+    for i, value in enumerate(hist):
         color += value
         if color > black_count:
             black_ind = i
             break
-    print("break 1")
     color = 0
     for i in range(len(hist) - 1, -1, -1):
         color += hist[i]
@@ -136,8 +135,7 @@ def contrast_stretch(img, black_point, white_point):
         )
     print("end hist ppend")
     # get black and white percentage indices
-    black_white_indices = ch_hists
-    print(len(ch_hists))
+    black_white_indices = []
     for hist in ch_hists:
         black_white_indices.append(
             get_black_white_indices(
@@ -151,7 +149,7 @@ def contrast_stretch(img, black_point, white_point):
     stretch_map = np.zeros((3, 256), dtype="uint8")
 
     # stretch histogram
-    for value, curr_ch in enumerate(black_white_indices):
+    for curr_ch, value in enumerate(black_white_indices):
         black_ind, white_ind = value
         for i in range(stretch_map.shape[1]):
             if i < black_ind:
