@@ -123,9 +123,7 @@ async def get_process(room_name: str, process: str):
         else:
             img_to_process = original_img_path
         if process == "Color":
-            print('call color')
             color.whiteboard_enhance(img_to_process, processed_img_path)
-            print('end color porcess')
         elif process == "B&W":
             black_n_white.black_n_white(img_to_process, processed_img_path)
         elif process == "Contrast":
@@ -137,7 +135,6 @@ async def get_process(room_name: str, process: str):
         img = cv2.imread(processed_img_path)
         volume = np.asarray(img)
         image = image_to_base64(volume)
-        print("image sent")
         return Response(content=image)
 
 
@@ -149,7 +146,6 @@ async def photo(room_name: Optional[str] = None):
         img = cv2.imread(original_img_path)
         volume = np.asarray(img)
         image = image_to_base64(volume)
-        print("original image sent")
         return Response(content=image)
     print("original image not found")
 
