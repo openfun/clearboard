@@ -72,8 +72,6 @@ origins = get_settings()
 MEDIA_ROOT = origins.MEDIA_ROOT
 ORIGINS = origins.ORIGINS.split(";")
 
-print(ORIGINS)
-
 
 async def send_message_true_broadcast(room_name):
     """notify all the participants of a room of a new picture"""

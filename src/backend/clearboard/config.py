@@ -1,5 +1,4 @@
 """Env configuration module"""
-import typing
 
 from pydantic import BaseSettings
 
