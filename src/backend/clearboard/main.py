@@ -19,8 +19,8 @@ from . import black_n_white, color, config, contrast, parallax
 
 app = FastAPI()
 
+
 DICO_COORD = {}
-MEDIA_ROOT = "/data/media"
 
 
 class ConnectionManager:
@@ -66,6 +66,13 @@ manager = ConnectionManager()
 def get_settings():
     """get settings form env"""
     return config.Settings()
+
+
+origins = get_settings()
+MEDIA_ROOT = origins.MEDIA_ROOT
+ORIGINS = origins.ORIGINS.split(";")
+
+print(ORIGINS)
 
 
 async def send_message_true_broadcast(room_name):

@@ -1,2 +1,2 @@
-ORIGINS='["http://localhost:3000"]'
 MEDIA_ROOT='/data/media'
+ORIGINS="https://localhost:3000"
