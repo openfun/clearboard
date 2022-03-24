@@ -15,12 +15,9 @@ import cv2  # Import the OpenCV library
 import numpy as np
 from pydantic import BaseModel
 
-from . import black_n_white, color, config, contrast, parallax
+from . import black_n_white, color, config, contrast, coord_loader, parallax
 
 app = FastAPI()
-
-
-DICO_COORD = {}
 
 
 class ConnectionManager:
@@ -120,13 +117,16 @@ async def get_process(room_name: str, process: str):
 
     original_img_path = MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
     img_cropped_path = MEDIA_ROOT + "/" + room_name + "/" + room_name + "cropped.jpg"
+    coord_path = MEDIA_ROOT + "/" + room_name + "/coord.txt"
     processed_img_path = (
         MEDIA_ROOT + "/" + room_name + "/" + room_name + process + ".jpg"
     )
 
     if os.path.exists(os.path.abspath(original_img_path)):
-        if room_name in DICO_COORD:
-            parallax.crop(original_img_path, DICO_COORD[room_name], img_cropped_path)
+        if os.path.exists(os.path.abspath(coord_path)):
+            parallax.crop(
+                original_img_path, coord_loader.get_coords(coord_path), img_cropped_path
+            )
             img_to_process = img_cropped_path
         else:
             img_to_process = original_img_path
@@ -174,5 +174,8 @@ async def post_coord(coordinates: Coordinates):
     """receive coordinates from the front, to crop the image"""
     room_name = coordinates.room_name
     coords = [[int(float(k[0])), int(float(k[1]))] for k in coordinates.coord]
-    DICO_COORD[room_name] = coords
+    coord_dir_path = MEDIA_ROOT + "/" + room_name
+    if not os.path.exists(coord_dir_path):
+        os.makedirs(coord_dir_path)
+    coord_loader.save_coords(coord_dir_path + "/coord.txt", coords)
     await send_message_true_broadcast(room_name)
