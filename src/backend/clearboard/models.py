@@ -1,5 +1,6 @@
 """Models defined for clearboard server"""
 from typing import List
+
 from pydantic import BaseModel
 
 

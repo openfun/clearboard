@@ -7,7 +7,15 @@ import shutil
 from functools import lru_cache
 from typing import List
 
-from fastapi import FastAPI, File, HTTPException, Response, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    File,
+    HTTPException,
+    Response,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 import cv2  # Import the OpenCV library
