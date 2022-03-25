@@ -43,14 +43,26 @@ The `app` container is the FastAPI web server that serves the API to:
 
 You should be able to access the API overview interface at (http://localhost:8070).
 
+#### Env
+
 You need to create a .env file in the backend repository to specify parameters used in clearboard/config.py. At the moment there are 2 parameters:
 
-- `CORE_ADDRESS` the part of the post address that is fixed (which will be exchanged with the front server)
-- `ORIGINS` used when adding a middle ware that whitelist origins that can contact the api
+- `MEDIA_ROOT` the root folder for saving pictures
+- `ORIGINS` used when adding a middle ware that whitelist origins that can contact the api, if you need to whitelist several addresses, use `;` to separate them.
 
 Example :
-CORE_ADDRESS="http://localhost:3000/"
-ORIGINS='["http://localhost:3000"]'
+MEDIA_ROOT="/data/media"
+ORIGINS="http://localhost:3000"
+
+#### Architecture
+
+All python scripts for the FastAPI are in the clearboard folder:
+
+- `main.py` is the main script that is running on the docker, it managed all the api routes
+- `config.py` load the env vars
+- `models.py` handle models used in main.py
+- `coord_loader.py` script implementing functions to load and save coord in file
+- `filters/*` all the filters already implemented and available
 
 #### Lambda enhance
 
