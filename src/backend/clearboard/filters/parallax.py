@@ -7,8 +7,8 @@ def order_points(points):
     """
     input : points : list of 4 points that defines 4 corners
     return a list of the coordinates of
-    the 4 points selected formated to this format 
-    (top_left_corner, top_right_corner, bottom_right_corner, bottom_left_corner) """
+    the 4 points selected formated to this format
+    (top_left_corner, top_right_corner, bottom_right_corner, bottom_left_corner)"""
 
     ordered_points = np.zeros((4, 2), dtype="float32")
     # sorting points by first coordinate
@@ -37,22 +37,22 @@ def four_point_transform(image, points):
     """return the image cropped"""
     ordered_points = order_points(points)
     width_first = np.sqrt(
-        ((ordered_points[2][0] - ordered_points[3][0]) ** 2) +
-        ((ordered_points[2][1] - ordered_points[3][1]) ** 2)
+        ((ordered_points[2][0] - ordered_points[3][0]) ** 2)
+        + ((ordered_points[2][1] - ordered_points[3][1]) ** 2)
     )
     width_second = np.sqrt(
-        ((ordered_points[1][0] - ordered_points[0][0]) ** 2) +
-        ((ordered_points[1][1] - ordered_points[0][1]) ** 2)
+        ((ordered_points[1][0] - ordered_points[0][0]) ** 2)
+        + ((ordered_points[1][1] - ordered_points[0][1]) ** 2)
     )
     # width of the image once the paralaxe is applied
     max_width = max(int(width_first), int(width_second))
     height_first = np.sqrt(
-        ((ordered_points[1][0] - ordered_points[2][0]) ** 2) +
-        ((ordered_points[1][1] - ordered_points[2][1]) ** 2)
+        ((ordered_points[1][0] - ordered_points[2][0]) ** 2)
+        + ((ordered_points[1][1] - ordered_points[2][1]) ** 2)
     )
     height_second = np.sqrt(
-        ((ordered_points[0][0] - ordered_points[3][0]) ** 2) +
-        ((ordered_points[0][1] - ordered_points[3][1]) ** 2)
+        ((ordered_points[0][0] - ordered_points[3][0]) ** 2)
+        + ((ordered_points[0][1] - ordered_points[3][1]) ** 2)
     )
     # height of the image once the paralaxe is applied
     max_height = max(int(height_first), int(height_second))

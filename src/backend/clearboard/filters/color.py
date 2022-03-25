@@ -232,13 +232,16 @@ def whiteboard_enhance(img, destination):
     # Negative of image
     negative_img = negate(dog(img, 15, 100, 0))
     # Contrast Stretch (CS)
-    contrast_stretch_img = contrast_stretch(negative_img, contrast_black_per, contrast_white_per)
+    contrast_stretch_img = contrast_stretch(
+        negative_img, contrast_black_per, contrast_white_per
+    )
     # Gaussian Blur
     blur_img = fast_gaussian_blur(contrast_stretch_img, gauss_k_size, gauss_sigma)
     # Gamma Correction
     gamma_img = gamma(blur_img, gamma_value)
     # Color Balance (CB) (also Contrast Stretch)
     color_balanced_img = color_balance(
-        gamma_img, color_balanced_black_per, color_balanced_white_per)
+        gamma_img, color_balanced_black_per, color_balanced_white_per
+    )
 
     cv2.imwrite(destination, color_balanced_img)

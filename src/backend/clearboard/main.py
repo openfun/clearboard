@@ -47,6 +47,7 @@ class ConnectionManager:
             if room_name == connection[1]:
                 await connection[0].send_text(message)
 
+
 # Getting env vars
 
 
@@ -103,7 +104,9 @@ async def get_process(room_name: str, filter: str):
     """receive the filter type to use on the image"""
 
     original_img_path = settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
-    img_cropped_path = settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + "cropped.jpg"
+    img_cropped_path = (
+        settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + "cropped.jpg"
+    )
     coord_path = settings.MEDIA_ROOT + "/" + room_name + "/coord.txt"
     filtered_img_path = (
         settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + filter + ".jpg"
@@ -127,7 +130,9 @@ async def get_process(room_name: str, filter: str):
             filtered_img_path = img_to_filter
         else:
             filtered_img_path = img_to_filter
-        return Response(content=image_to_base64(np.asarray(cv2.imread(filtered_img_path))))
+        return Response(
+            content=image_to_base64(np.asarray(cv2.imread(filtered_img_path)))
+        )
     else:
         raise HTTPException(status_code=404, detail="No image to filter")
 
@@ -138,9 +143,13 @@ async def photo(room_name: str = None):
     if room_name == None:
         raise HTTPException(status_code=404, detail="No room name given")
     else:
-        original_img_path = settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
+        original_img_path = (
+            settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
+        )
         if os.path.exists(os.path.abspath(original_img_path)):
-            return Response(content=image_to_base64(np.asarray(cv2.imread(original_img_path))))
+            return Response(
+                content=image_to_base64(np.asarray(cv2.imread(original_img_path)))
+            )
         else:
             raise HTTPException(status_code=404, detail="No room name given")
 
