@@ -65,7 +65,7 @@ app = FastAPI()
 # add Middleware settings to open connection with front
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ORIGINS.split(";"),
+    allow_origins=settings.ORIGINS.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
