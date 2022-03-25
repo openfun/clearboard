@@ -20,7 +20,7 @@ def normalize_kernel(kernel, k_width, k_height, scaling_factor=1.0):
     if abs(pos_sum) < k_eps:
         pos_sum = 1.0
     if abs(neg_sum) < k_eps:
-        neg_factor = 1.0
+        neg_sum = 1.0
 
     pos_factor = scaling_factor / pos_sum
     neg_factor = scaling_factor / neg_sum
