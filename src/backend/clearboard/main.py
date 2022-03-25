@@ -1,23 +1,29 @@
 """FastAPI main module for the Clearboard application.
-origins : string[],
-url to whitelist and on which the fastapi server should listen (basicly the core address)
+some env vars are needed to configure the server, see README for further informations
 """
 import base64
 import os
 import shutil
 from functools import lru_cache
-from typing import List, Optional
+from typing import List
 
-from fastapi import FastAPI, File, Response, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    File,
+    HTTPException,
+    Response,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 import cv2  # Import the OpenCV library
 import numpy as np
-from pydantic import BaseModel
 
-from . import black_n_white, color, config, contrast, coord_loader, parallax
-
-app = FastAPI()
+from . import config, coord_loader
+from .filters import black_n_white, color, contrast, parallax
+from .models import Coordinates
 
 
 class ConnectionManager:
@@ -42,21 +48,7 @@ class ConnectionManager:
                 await connection[0].send_text(message)
 
 
-class Coordinates(BaseModel):
-    """given a specific room name, class to define the coordinates for cropping"""
-
-    coord: List[List[str]] = []
-    room_name: str
-
-
-class Process(BaseModel):
-    """given a specific room name, class to define the image process used"""
-
-    process: str
-    room_name: str
-
-
-manager = ConnectionManager()
+# Getting env vars
 
 
 @lru_cache()
@@ -65,9 +57,25 @@ def get_settings():
     return config.Settings()
 
 
-origins = get_settings()
-MEDIA_ROOT = origins.MEDIA_ROOT
-ORIGINS = origins.ORIGINS.split(";")
+settings = get_settings()
+# Websocket
+manager = ConnectionManager()
+# FastAPI server
+app = FastAPI()
+# add Middleware settings to open connection with front
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ORIGINS.split(";"),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def image_to_base64(img: np.ndarray) -> bytes:
+    """Given a numpy 2D array, returns a JPEG image in base64 format"""
+    img_buffer = cv2.imencode(".jpg", img)[1]
+    return base64.b64encode(img_buffer).decode("utf-8")
 
 
 async def send_message_true_broadcast(room_name):
@@ -75,27 +83,13 @@ async def send_message_true_broadcast(room_name):
     await manager.broadcast("true", room_name)
 
 
-# Remove env loading
-# settings = get_settings()
-
-app.add_middleware(
-    CORSMiddleware,
-    # allow_origins=settings.ORIGINS,
-    allow_origins=["https://jitsi-box.com", "https://www.jitsi-box.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
 @app.post("/picture")
 async def post_picture(file: UploadFile = File(...)):
-    """receive image not processed from the jitsi box, not from the student interface"""
+    """receive image not filtered from the jitsi box, not from the student interface"""
     if not file:
-        return {"message": "error"}
-    path = f"{MEDIA_ROOT}/{file.filename[:-4]}"
+        raise HTTPException(status_code=502, detail="Picture not received")
+    path = f"{settings.MEDIA_ROOT}/{file.filename[:-4]}"
     path_original_image = f"{path}/{file.filename}"
-    print(file.filename[:-4])
     await send_message_true_broadcast(file.filename[:-4])
 
     if not os.path.exists(path):
@@ -105,21 +99,17 @@ async def post_picture(file: UploadFile = File(...)):
     return {"message": file.filename}
 
 
-def image_to_base64(img: np.ndarray) -> bytes:
-    """Given a numpy 2D array, returns a JPEG image in base64 format"""
-    img_buffer = cv2.imencode(".jpg", img)[1]
-    return base64.b64encode(img_buffer).decode("utf-8")
-
-
-@app.get("/process")
-async def get_process(room_name: str, process: str):
+@app.get("/filter")
+async def get_process(room_name: str, filter: str):
     """receive the filter type to use on the image"""
 
-    original_img_path = MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
-    img_cropped_path = MEDIA_ROOT + "/" + room_name + "/" + room_name + "cropped.jpg"
-    coord_path = MEDIA_ROOT + "/" + room_name + "/coord.txt"
-    processed_img_path = (
-        MEDIA_ROOT + "/" + room_name + "/" + room_name + process + ".jpg"
+    original_img_path = settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
+    img_cropped_path = (
+        settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + "cropped.jpg"
+    )
+    coord_path = settings.MEDIA_ROOT + "/" + room_name + "/coord.txt"
+    filtered_img_path = (
+        settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + filter + ".jpg"
     )
 
     if os.path.exists(os.path.abspath(original_img_path)):
@@ -127,35 +117,41 @@ async def get_process(room_name: str, process: str):
             parallax.crop(
                 original_img_path, coord_loader.get_coords(coord_path), img_cropped_path
             )
-            img_to_process = img_cropped_path
+            img_to_filter = img_cropped_path
         else:
-            img_to_process = original_img_path
-        if process == "Color":
-            color.whiteboard_enhance(img_to_process, processed_img_path)
-        elif process == "B&W":
-            black_n_white.black_n_white(img_to_process, processed_img_path)
-        elif process == "Contrast":
-            contrast.enhance_contrast(img_to_process, processed_img_path)
-        elif process == "original":
-            processed_img_path = img_to_process
+            img_to_filter = original_img_path
+        if filter == "Color":
+            color.whiteboard_enhance(img_to_filter, filtered_img_path)
+        elif filter == "B&W":
+            black_n_white.black_n_white(img_to_filter, filtered_img_path)
+        elif filter == "Contrast":
+            contrast.enhance_contrast(img_to_filter, filtered_img_path)
+        elif filter == "original":
+            filtered_img_path = img_to_filter
         else:
-            processed_img_path = img_to_process
-        img = cv2.imread(processed_img_path)
-        volume = np.asarray(img)
-        image = image_to_base64(volume)
-        return Response(content=image)
+            filtered_img_path = img_to_filter
+        return Response(
+            content=image_to_base64(np.asarray(cv2.imread(filtered_img_path)))
+        )
+    else:
+        raise HTTPException(status_code=404, detail="No image to filter")
 
 
 @app.get("/original_photo")
-async def photo(room_name: Optional[str] = None):
+async def photo(room_name: str = None):
     """request from front to get the image not processed"""
-    original_img_path = MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
-    if os.path.exists(os.path.abspath(original_img_path)):
-        img = cv2.imread(original_img_path)
-        volume = np.asarray(img)
-        image = image_to_base64(volume)
-        return Response(content=image)
-    print("original image not found")
+    if room_name == None:
+        raise HTTPException(status_code=404, detail="No room name given")
+    else:
+        original_img_path = (
+            settings.MEDIA_ROOT + "/" + room_name + "/" + room_name + ".jpg"
+        )
+        if os.path.exists(os.path.abspath(original_img_path)):
+            return Response(
+                content=image_to_base64(np.asarray(cv2.imread(original_img_path)))
+            )
+        else:
+            raise HTTPException(status_code=404, detail="No room name given")
 
 
 @app.websocket("/ws/{room_name}/{id}")
@@ -172,10 +168,9 @@ async def websocket_endpoint(websocket: WebSocket, room_name: str):
 @app.post("/coord")
 async def post_coord(coordinates: Coordinates):
     """receive coordinates from the front, to crop the image"""
-    room_name = coordinates.room_name
     coords = [[int(float(k[0])), int(float(k[1]))] for k in coordinates.coord]
-    coord_dir_path = MEDIA_ROOT + "/" + room_name
+    coord_dir_path = settings.MEDIA_ROOT + "/" + coordinates.room_name
     if not os.path.exists(coord_dir_path):
         os.makedirs(coord_dir_path)
     coord_loader.save_coords(coord_dir_path + "/coord.txt", coords)
-    await send_message_true_broadcast(room_name)
+    await send_message_true_broadcast(coordinates.room_name)
