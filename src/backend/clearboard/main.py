@@ -67,7 +67,7 @@ def get_settings():
 
 origins = get_settings()
 MEDIA_ROOT = origins.MEDIA_ROOT
-ORIGINS = origins.ORIGINS.split(";")
+ORIGINS = origins.ORIGINS.split(",")
 
 
 async def send_message_true_broadcast(room_name):
