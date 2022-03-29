@@ -9,7 +9,7 @@ def black_n_white(name, dest):
 
     img_original = cv2.imread(name, 0)
     values = np.arange(0, 256)
-    look_up_table = np.uint8(255 * np.power((values/255.0), gamma))
+    look_up_table = np.uint8(255 * np.power((values / 255.0), gamma))
     res = cv2.LUT(img_original, look_up_table)
 
     clahe = cv2.createCLAHE(clipLimit=0.5, tileGridSize=(16, 16)).apply(res)
@@ -17,6 +17,7 @@ def black_n_white(name, dest):
     sharpen_kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
     sharpen = cv2.filter2D(res, -1, sharpen_kernel)
 
-    thresh = cv2.adaptiveThreshold(clahe, 190, cv2.ADAPTIVE_THRESH_MEAN_C,
-                                   cv2.THRESH_BINARY, 11, 12)
+    thresh = cv2.adaptiveThreshold(
+        clahe, 190, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 12
+    )
     cv2.imwrite(dest, thresh)
