@@ -43,18 +43,30 @@ The `app` container is the FastAPI web server that serves the API to:
 
 You should be able to access the API overview interface at (http://localhost:8070).
 
+#### Env
+
 You need to create a .env file in the backend repository to specify parameters used in clearboard/config.py. At the moment there are 2 parameters:
 
-- `CORE_ADDRESS` the part of the post address that is fixed (which will be exchanged with the front server)
-- `ORIGINS` used when adding a middle ware that whitelist origins that can contact the api
+- `MEDIA_ROOT` the root folder for saving pictures
+- `ORIGINS` used when adding a middle ware that whitelist origins that can contact the api, if you need to whitelist several addresses, use `,` to separate them.
 
 Example :
-CORE_ADDRESS="http://localhost:3000/"
-ORIGINS='["http://localhost:3000"]'
+MEDIA_ROOT="/data/media"
+ORIGINS="http://localhost:3000,https://www.example.com"
+
+#### Architecture
+
+All python scripts for the FastAPI server are in the clearboard folder:
+
+- `main.py` is the main script that is running on the docker, it managed all the api routes
+- `config.py` load the env vars
+- `models.py` handle models used in main.py
+- `coord_loader.py` script implementing functions to load and save coordinates in file
+- `black_n_white.py, color.py, contrast.py, parallax.py` filters already implemented and available
 
 #### Lambda enhance
 
-The `lambda-enhance` container holds the Python script that processes images in an AWS lambda.
+The `lambda-enhance` container holds the Python script that processes images in an AWS lambda. It is not implemented yet.
 
 The lambda is triggered by S3 each time an image is uploaded to it. It processes the image and
 deposits the result in the destination bucket.
